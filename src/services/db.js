@@ -74,11 +74,24 @@ export function resetLocalStorage() {
 let supabaseClient = null;
 
 export function getSupabaseConfig() {
-  return getStorage(STORAGE_KEYS.SUPABASE_CONFIG, {
-    url: import.meta.env.VITE_SUPABASE_URL || '',
-    anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-    enabled: false
-  });
+  const defaultUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xqfjreafdkpvlsxuxhiu.supabase.co';
+  const defaultKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxZmpyZWFmZGtwdmxzeHV4aGl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4MTUwMjMsImV4cCI6MjEwNzM5MTAyM30.5KSccVn1QTcqNd19OuNkyZgQEfdCQ9hUs-K8eq-t5m4';
+
+  const stored = getStorage(STORAGE_KEYS.SUPABASE_CONFIG, null);
+  if (stored) {
+    return {
+      ...stored,
+      url: stored.url || defaultUrl,
+      anonKey: stored.anonKey || defaultKey,
+      enabled: stored.enabled !== undefined ? stored.enabled : true
+    };
+  }
+
+  return {
+    url: defaultUrl,
+    anonKey: defaultKey,
+    enabled: true
+  };
 }
 
 export function saveSupabaseConfig(config) {
@@ -134,17 +147,21 @@ export const dbService = {
   // USERS & AUTHENTICATION
   async getAllUsers() {
     if (isUsingSupabase()) {
-      const { data, error } = await supabaseClient
-        .from('app_user')
-        .select(`
-          user_id, name, email, bio, date_joined, date_of_birth,
-          profile (profile_id, profile_picture, location, website)
-        `);
-      if (!error && data) {
-        return data.map(u => ({
-          ...u,
-          profile: Array.isArray(u.profile) ? u.profile[0] : (u.profile || {})
-        }));
+      try {
+        const { data, error } = await supabaseClient
+          .from('app_user')
+          .select(`
+            user_id, name, email, bio, date_joined, date_of_birth,
+            profile (profile_id, profile_picture, location, website)
+          `);
+        if (!error && data && data.length > 0) {
+          return data.map(u => ({
+            ...u,
+            profile: Array.isArray(u.profile) ? u.profile[0] : (u.profile || {})
+          }));
+        }
+      } catch (e) {
+        console.warn("Supabase fetch users error, falling back to local dataset:", e);
       }
     }
     initLocalStorage();

@@ -361,3 +361,35 @@ INSERT INTO message (sender_id, receiver_id, message_text, is_read) VALUES
 (2, 1, 'Hey Alex! Did you get a chance to review the new design mockups?', 'Y'),
 (1, 2, 'Hey Sarah! Yes, they look sensational. Integrating them right now!', 'Y'),
 (3, 1, 'Alex, check out the updated schema indexing script when you have time.', 'N');
+
+-- ============================ ROW LEVEL SECURITY (RLS) ============================
+-- Enable RLS and grant public access for frontend demo via anon key
+ALTER TABLE app_user ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profile ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_comment ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_like ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_follow ENABLE ROW LEVEL SECURITY;
+ALTER TABLE hashtag ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_hashtag ENABLE ROW LEVEL SECURITY;
+ALTER TABLE media ENABLE ROW LEVEL SECURITY;
+ALTER TABLE social_platform ENABLE ROW LEVEL SECURITY;
+ALTER TABLE social_account ENABLE ROW LEVEL SECURITY;
+ALTER TABLE message ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification ENABLE ROW LEVEL SECURITY;
+
+-- Allow anon public read and write policies
+CREATE POLICY "Public full access to app_user" ON app_user FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public full access to profile" ON profile FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public full access to post" ON post FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public full access to post_comment" ON post_comment FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public full access to post_like" ON post_like FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public full access to user_follow" ON user_follow FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public full access to hashtag" ON hashtag FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public full access to post_hashtag" ON post_hashtag FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public full access to media" ON media FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public full access to social_platform" ON social_platform FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public full access to social_account" ON social_account FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public full access to message" ON message FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public full access to notification" ON notification FOR ALL USING (true) WITH CHECK (true);
+
