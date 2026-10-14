@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { dbService } from '../services/db';
+import { dbService, getClient, isUsingSupabase } from '../services/db';
 import { 
   Database, 
   X, 
@@ -11,7 +11,9 @@ import {
   RefreshCw, 
   Layers, 
   Zap,
-  Code2
+  Code2,
+  Server,
+  Sparkles
 } from 'lucide-react';
 
 export function SupabaseSettingsModal({ isOpen, onClose }) {
@@ -21,8 +23,36 @@ export function SupabaseSettingsModal({ isOpen, onClose }) {
   const [enabled, setEnabled] = useState(supabaseConfig.enabled || false);
   const [testResult, setTestResult] = useState(null);
   const [testing, setTesting] = useState(false);
-  const [copiedSql, setCopiedSql] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [seedResult, setSeedResult] = useState(null);
+  const [liveStats, setLiveStats] = useState({ users: null, posts: null });
   const [activeTab, setActiveTab] = useState('connect'); // 'connect' | 'schema'
+
+  const checkLiveStats = async () => {
+    if (isUsingSupabase()) {
+      try {
+        const client = getClient();
+        if (client) {
+          const [uRes, pRes] = await Promise.all([
+            client.from('app_user').select('*', { count: 'exact', head: true }),
+            client.from('post').select('*', { count: 'exact', head: true })
+          ]);
+          setLiveStats({
+            users: uRes.count !== null ? uRes.count : 0,
+            posts: pRes.count !== null ? pRes.count : 0
+          });
+        }
+      } catch (e) {
+        // silent
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      checkLiveStats();
+    }
+  }, [isOpen, enabled]);
 
   if (!isOpen) return null;
 
@@ -36,6 +66,26 @@ export function SupabaseSettingsModal({ isOpen, onClose }) {
     const res = await dbService.testSupabaseConnection(url, anonKey);
     setTesting(false);
     setTestResult(res);
+    if (res.success) {
+      checkLiveStats();
+    }
+  };
+
+  const handleSeedSupabase = async () => {
+    setSeeding(true);
+    setSeedResult(null);
+    try {
+      const res = await dbService.seedSupabaseDatabase();
+      setSeedResult(res);
+      await checkLiveStats();
+    } catch (err) {
+      setSeedResult({
+        success: false,
+        message: err.message || 'Failed to seed Supabase database. Make sure RLS is disabled in Supabase SQL editor.'
+      });
+    } finally {
+      setSeeding(false);
+    }
   };
 
   const handleSave = () => {
@@ -45,14 +95,6 @@ export function SupabaseSettingsModal({ isOpen, onClose }) {
       enabled: enabled && Boolean(url && anonKey)
     });
     onClose();
-  };
-
-  const handleCopySql = () => {
-    const sqlCode = `-- ============================ SUPABASE SCHEMA ============================
--- Tables, Triggers & Procedures are available in supabase_schema.sql in the project root!`;
-    navigator.clipboard?.writeText(sqlCode);
-    setCopiedSql(true);
-    setTimeout(() => setCopiedSql(false), 2000);
   };
 
   const tables = [
@@ -85,7 +127,7 @@ export function SupabaseSettingsModal({ isOpen, onClose }) {
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: 'rgba(0, 0, 0, 0.8)',
+      background: 'rgba(0, 0, 0, 0.85)',
       backdropFilter: 'blur(10px)',
       display: 'flex',
       alignItems: 'center',
@@ -127,7 +169,7 @@ export function SupabaseSettingsModal({ isOpen, onClose }) {
                 Database Architecture & Supabase Config
               </h2>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                PostgreSQL Relational Schema & Real-time Integration
+                Direct Supabase PostgreSQL Schema & Real-time Integration
               </div>
             </div>
           </div>
@@ -154,7 +196,7 @@ export function SupabaseSettingsModal({ isOpen, onClose }) {
               cursor: 'pointer'
             }}
           >
-            Supabase Connection
+            Supabase Connection & Sync
           </button>
           <button
             onClick={() => setActiveTab('schema')}
@@ -175,6 +217,7 @@ export function SupabaseSettingsModal({ isOpen, onClose }) {
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
           {activeTab === 'connect' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              {/* Supabase status banner */}
               <div style={{
                 background: 'rgba(99, 102, 241, 0.1)',
                 border: '1px solid rgba(99, 102, 241, 0.25)',
@@ -184,10 +227,18 @@ export function SupabaseSettingsModal({ isOpen, onClose }) {
                 color: '#cbd5e1',
                 lineHeight: 1.5
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#a5b4fc', fontWeight: 700, marginBottom: '4px' }}>
-                  <Zap size={16} /> Dual-Engine Architecture
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#a5b4fc', fontWeight: 700 }}>
+                    <Server size={16} /> Live Supabase Mode
+                  </div>
+                  {liveStats.users !== null && (
+                    <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem' }}>
+                      <span className="glow-pill purple">Users: {liveStats.users}</span>
+                      <span className="glow-pill green">Posts: {liveStats.posts}</span>
+                    </div>
+                  )}
                 </div>
-                The app comes pre-configured with a zero-friction in-memory PostgreSQL emulator so you can test all features (login, multi-user switching, triggers, comments, likes, follower counts) instantly. You can also connect directly to your live Supabase database below!
+                All operations (adding posts, comments, likes, messages, follow/unfollow, and user registration) execute direct PostgreSQL queries against your Supabase instance.
               </div>
 
               <div>
@@ -225,7 +276,7 @@ export function SupabaseSettingsModal({ isOpen, onClose }) {
                   style={{ width: '16px', height: '16px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
                 />
                 <label htmlFor="enable-supabase" style={{ fontSize: '0.85rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
-                  Enable Supabase Client Mode (Fallback to Local Engine if offline)
+                  Enable Supabase Client Mode (Updates & Queries live database)
                 </label>
               </div>
 
@@ -246,30 +297,60 @@ export function SupabaseSettingsModal({ isOpen, onClose }) {
                 </div>
               )}
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px' }}>
-                <button
-                  type="button"
-                  onClick={handleTestConnection}
-                  disabled={testing}
-                  className="btn-secondary"
-                  style={{ fontSize: '0.85rem' }}
-                >
-                  <RefreshCw size={14} className={testing ? 'animate-spin' : ''} />
-                  <span>{testing ? 'Testing...' : 'Test Connection'}</span>
-                </button>
+              {seedResult && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  fontSize: '0.825rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: seedResult.success ? 'rgba(16, 185, 129, 0.15)' : 'rgba(244, 63, 94, 0.15)',
+                  border: seedResult.success ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(244, 63, 94, 0.3)',
+                  color: seedResult.success ? '#6ee7b7' : '#fca5a5'
+                }}>
+                  {seedResult.success ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                  <span>{seedResult.message}</span>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', paddingTop: '10px' }}>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={handleTestConnection}
+                    disabled={testing}
+                    className="btn-secondary"
+                    style={{ fontSize: '0.85rem' }}
+                  >
+                    <RefreshCw size={14} className={testing ? 'animate-spin' : ''} />
+                    <span>{testing ? 'Testing...' : 'Test Connection'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSeedSupabase}
+                    disabled={seeding}
+                    className="btn-primary"
+                    style={{ fontSize: '0.85rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}
+                  >
+                    <Sparkles size={14} className={seeding ? 'animate-spin' : ''} />
+                    <span>{seeding ? 'Seeding...' : 'Seed Supabase Data'}</span>
+                  </button>
+                </div>
 
                 <button
                   type="button"
                   onClick={() => {
-                    if (confirm('Reset local database back to default seed users and sample posts?')) {
+                    if (confirm('Reset local cache data?')) {
                       resetAllData();
-                      alert('Database restored to default demo seed state!');
+                      alert('Local cache restored to initial state!');
                     }
                   }}
                   className="btn-ghost"
                   style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}
                 >
-                  Reset Local Demo Data
+                  Reset Local Cache
                 </button>
               </div>
             </div>

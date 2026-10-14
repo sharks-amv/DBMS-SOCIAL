@@ -16,8 +16,9 @@ export function ExploreView({ onSelectHashtag, onSelectUser, selectedTag }) {
   const [posts, setPosts] = useState([]);
 
   useEffect(() => {
-    const tags = dbService.getHashtags();
-    setHashtags(tags);
+    dbService.fetchHashtags().then(tags => {
+      if (tags && tags.length) setHashtags(tags);
+    });
     loadPosts();
   }, [activeTag]);
 

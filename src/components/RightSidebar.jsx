@@ -13,8 +13,13 @@ import {
 
 export function RightSidebar({ onSelectHashtag, onSelectUser, onRefreshFeed }) {
   const { currentUser, users, switchUser } = useAuth();
+  const [hashtags, setHashtags] = React.useState(dbService.getHashtags());
 
-  const hashtags = dbService.getHashtags();
+  React.useEffect(() => {
+    dbService.fetchHashtags().then(tags => {
+      if (tags && tags.length) setHashtags(tags);
+    });
+  }, []);
 
   const handleToggleFollow = async (targetUserId) => {
     if (!currentUser) return;
